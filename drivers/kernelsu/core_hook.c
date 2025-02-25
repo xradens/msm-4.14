@@ -124,6 +124,10 @@ static bool ksu_module_mounted = false;
 
 extern int ksu_handle_sepolicy(unsigned long arg3, void __user *arg4);
 
+static bool ksu_su_compat_enabled = true;
+extern void ksu_sucompat_init();
+extern void ksu_sucompat_exit();
+
 static inline bool is_allow_su()
 {
 	if (ksu_is_manager()) {
@@ -327,10 +331,12 @@ static void nuke_ext4_sysfs() {
 	const char* name = sb->s_type->name;
 	if (strcmp(name, "ext4") != 0) {
 		pr_info("nuke but module aren't mounted\n");
+		path_put(&path);
 		return;
 	}
 
 	ext4_unregister_sysfs(sb);
+ 	path_put(&path);
 }
 
 int ksu_handle_prctl(int option, unsigned long arg2, unsigned long arg3,
@@ -391,12 +397,12 @@ int ksu_handle_prctl(int option, unsigned long arg2, unsigned long arg3,
 		if (copy_to_user(arg3, &version, sizeof(version))) {
 			pr_err("prctl reply error, cmd: %lu\n", arg2);
 		}
+		u32 version_flags = 0;
 #ifdef MODULE
-		u32 is_lkm = 0x1;
-#else
-		u32 is_lkm = 0x0;
+		version_flags |= 0x1;
 #endif
-		if (arg4 && copy_to_user(arg4, &is_lkm, sizeof(is_lkm))) {
+		if (arg4 &&
+		    copy_to_user(arg4, &version_flags, sizeof(version_flags))) {
 			pr_err("prctl reply error, cmd: %lu\n", arg2);
 		}
 		return 0;
@@ -878,6 +884,39 @@ int ksu_handle_prctl(int option, unsigned long arg2, unsigned long arg3,
 		return 0;
 	}
 
+	if (arg2 == CMD_IS_SU_ENABLED) {
+		if (copy_to_user(arg3, &ksu_su_compat_enabled,
+				 sizeof(ksu_su_compat_enabled))) {
+			pr_err("copy su compat failed\n");
+			return 0;
+		}
+		if (copy_to_user(result, &reply_ok, sizeof(reply_ok))) {
+			pr_err("prctl reply error, cmd: %lu\n", arg2);
+		}
+		return 0;
+	}
+
+	if (arg2 == CMD_ENABLE_SU) {
+		bool enabled = (arg3 != 0);
+		if (enabled == ksu_su_compat_enabled) {
+			pr_info("cmd enable su but no need to change.\n");
+			return 0;
+		}
+
+		if (enabled) {
+			ksu_sucompat_init();
+		} else {
+			ksu_sucompat_exit();
+		}
+		ksu_su_compat_enabled = enabled;
+
+		if (copy_to_user(result, &reply_ok, sizeof(reply_ok))) {
+			pr_err("prctl reply error, cmd: %lu\n", arg2);
+		}
+
+		return 0;
+	}
+
 	return 0;
 }
 
@@ -980,26 +1019,6 @@ void susfs_try_umount_all(uid_t uid) {
 	// try umount lsposed dex2oat bins
 	ksu_try_umount("/apex/com.android.art/bin/dex2oat64", false, MNT_DETACH, uid);
 	ksu_try_umount("/apex/com.android.art/bin/dex2oat32", false, MNT_DETACH, uid);
-
-	// try umount pixelify gphotos spoof configs
-	ksu_try_umount("/system/etc/sysconfig/pixel_2017_exclusive.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/system/etc/sysconfig/pixel_2018_exclusive.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/system/etc/sysconfig/pixel_2019_exclusive.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/product/etc/sysconfig/pixel_2016_exclusive.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/product/etc/sysconfig/pixel_2017_exclusive.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/product/etc/sysconfig/pixel_2018_exclusive.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/product/etc/sysconfig/pixel_2019_exclusive.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2017.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2018.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2019.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2019_midyear.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2020.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2020_midyear.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2021.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2021_midyear.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2022.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2022_midyear.xml", false, MNT_DETACH, uid);
-	ksu_try_umount("/product/etc/sysconfig/pixelify_experience.xml", false, MNT_DETACH, uid);
 }
 #endif
 
@@ -1103,26 +1122,6 @@ out_ksu_try_umount:
 	// try umount lsposed dex2oat bins
 	ksu_try_umount("/apex/com.android.art/bin/dex2oat64", false, MNT_DETACH);
 	ksu_try_umount("/apex/com.android.art/bin/dex2oat32", false, MNT_DETACH);
-
-	// try umount pixelify gphotos spoof configs
-	ksu_try_umount("/system/etc/sysconfig/pixel_2017_exclusive.xml", false, MNT_DETACH);
-	ksu_try_umount("/system/etc/sysconfig/pixel_2018_exclusive.xml", false, MNT_DETACH);
-	ksu_try_umount("/system/etc/sysconfig/pixel_2019_exclusive.xml", false, MNT_DETACH);
-	ksu_try_umount("/product/etc/sysconfig/pixel_2016_exclusive.xml", false, MNT_DETACH);
-	ksu_try_umount("/product/etc/sysconfig/pixel_2017_exclusive.xml", false, MNT_DETACH);
-	ksu_try_umount("/product/etc/sysconfig/pixel_2018_exclusive.xml", false, MNT_DETACH);
-	ksu_try_umount("/product/etc/sysconfig/pixel_2019_exclusive.xml", false, MNT_DETACH);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2017.xml", false, MNT_DETACH);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2018.xml", false, MNT_DETACH);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2019.xml", false, MNT_DETACH);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2019_midyear.xml", false, MNT_DETACH);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2020.xml", false, MNT_DETACH);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2020_midyear.xml", false, MNT_DETACH);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2021.xml", false, MNT_DETACH);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2021_midyear.xml", false, MNT_DETACH);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2022.xml", false, MNT_DETACH);
-	ksu_try_umount("/product/etc/sysconfig/pixel_experience_2022_midyear.xml", false, MNT_DETACH);
-	ksu_try_umount("/product/etc/sysconfig/pixelify_experience.xml", false, MNT_DETACH);
 #endif
 	return 0;
 }
@@ -1426,7 +1425,7 @@ void __init ksu_core_init(void)
 
 void ksu_core_exit(void)
 {
-#ifdef CONFIG_KPROBES
+#ifdef CONFIG_KSU_WITH_KPROBES
 	pr_info("ksu_core_kprobe_exit\n");
 	// we dont use this now
 	// ksu_kprobe_exit();
