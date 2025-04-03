@@ -1,18 +1,15 @@
 #!/bin/bash
 #
-# Compile script for FSociety kernel
+# Compile script for XRadens kernel
 # Copyright (C) 2020-2021 Adithya R.
+# Copyright (C) 2025 xradens
 
 SECONDS=0 # builtin bash timer
-ZIPNAME="FSociety-surya-$(date '+%Y%m%d-%H%M').zip"
-TC_DIR="$(pwd)/tc/clang-19"
+BRANCH="Azure"
+ZIPNAME="$BRANCH-surya-$(date '+%Y%m%d').zip"
+TC_DIR="$(pwd)/tc/clang-20"
 AK3_DIR="$(pwd)/android/AnyKernel3"
 DEFCONFIG="surya_defconfig"
-
-if test -z "$(git rev-parse --show-cdup 2>/dev/null)" &&
-   head=$(git rev-parse --verify HEAD 2>/dev/null); then
-	ZIPNAME="${ZIPNAME::-4}-$(echo $head | cut -c1-8).zip"
-fi
 
 export PATH="$TC_DIR/bin:$PATH"
 
@@ -51,12 +48,12 @@ sync_repo() {
 }
 
 if [[ $1 = "-u" || $1 = "--update" ]]; then
-    sync_repo $AK3_DIR "https://github.com/rd-stuffs/AnyKernel3.git" "FSociety" true
-    sync_repo $TC_DIR "https://bitbucket.org/rdxzv/clang-standalone.git" "19" true
+    sync_repo $AK3_DIR "https://github.com/xradens/AnyKernel3.git" "$BRANCH" true
+    sync_repo $TC_DIR "https://bitbucket.org/rdxzv/clang-standalone.git" "20" true
 	exit
 else
-    sync_repo $AK3_DIR "https://github.com/rd-stuffs/AnyKernel3.git" "FSociety" false
-    sync_repo $TC_DIR "https://bitbucket.org/rdxzv/clang-standalone.git" "19" false
+    sync_repo $AK3_DIR "https://github.com/xradens/AnyKernel3.git" "$BRANCH" false
+    sync_repo $TC_DIR "https://bitbucket.org/rdxzv/clang-standalone.git" "20" false
 fi
 
 if [ ! -d "$AK3_DIR" ] || [ ! -d "$TC_DIR" ]; then
@@ -88,7 +85,7 @@ for arg in "$@"; do
 			;;
 		-s|--su)
 			ENABLE_KSU=true
-			ZIPNAME="${ZIPNAME/FSociety-surya/FSociety-KSU}"
+			ZIPNAME="${ZIPNAME/Azure-surya/Azure-surya-KSUN}"
 			;;
 		*)
 			echo "Unknown argument: $arg"
@@ -107,7 +104,6 @@ if $ENABLE_KSU; then
 	KSU_DEFCONFIG="ksu_${DEFCONFIG}"
 	KSU_DEFCONFIG_PATH="arch/arm64/configs/${KSU_DEFCONFIG}"
 	cp arch/arm64/configs/$DEFCONFIG $KSU_DEFCONFIG_PATH
-	sed -i 's/FSociety/FSociety-KSU/g' $KSU_DEFCONFIG_PATH
 	sed -i 's/# CONFIG_KSU is not set/CONFIG_KSU=y/g' $KSU_DEFCONFIG_PATH
 	trap '[[ -f $KSU_DEFCONFIG_PATH ]] && rm -f $KSU_DEFCONFIG_PATH' EXIT
 fi
@@ -129,7 +125,7 @@ if [ -f "$kernel" ] && [ -f "$dtb" ] && [ -f "$dtbo" ]; then
 	cp -r $AK3_DIR AnyKernel3
 	cp $kernel $dtb $dtbo AnyKernel3
 	cd AnyKernel3
-	git checkout FSociety &> /dev/null
+	git checkout $BRANCH &> /dev/null
 	zip -r9 "../$ZIPNAME" * -x .git modules\* patch\* ramdisk\* README.md *placeholder
 	cd ..
 	rm -rf AnyKernel3
