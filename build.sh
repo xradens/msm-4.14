@@ -6,7 +6,7 @@
 
 SECONDS=0 # builtin bash timer
 BRANCH="Azure"
-ZIPNAME="$BRANCH-surya-$(date '+%Y%m%d-%H%M').zip"
+ZIPNAME="RotersOS-kernel_A11-A12.zip"
 TC_DIR="$(pwd)/tc/clang-20"
 AK3_DIR="$(pwd)/android/AnyKernel3"
 DEFCONFIG="surya_defconfig"
@@ -85,7 +85,7 @@ for arg in "$@"; do
 			;;
 		-s|--su)
 			ENABLE_KSU=true
-			ZIPNAME="${ZIPNAME/Azure-surya/Azure-KSU+SuSFS-surya}"
+			ZIPNAME="${ZIPNAME/RotersOS-kernel_A11-A12/RotersOS-kernel_A11-A12-KSU+SuSFS}"
 			;;
 		*)
 			echo "Unknown argument: $arg"
@@ -124,6 +124,9 @@ if [ -f "$kernel" ] && [ -f "$dtb" ] && [ -f "$dtbo" ]; then
 	echo -e "\nKernel compiled successfully! Zipping up...\n"
 	cp -r $AK3_DIR AnyKernel3
 	cp $kernel $dtb $dtbo AnyKernel3
+	sed -i "s/device\.name1=.*/device.name1=surya/" AnyKernel3/anykernel.sh
+	sed -i "s/device\.name2=.*/device.name2=karna/" AnyKernel3/anykernel.sh
+	sed -i "s/supported\.versions=.*/supported.versions=11-12/" AnyKernel3/anykernel.sh
 	cd AnyKernel3
 	git checkout $BRANCH &> /dev/null
 	zip -r9 "../$ZIPNAME" * -x .git modules\* patch\* ramdisk\* README.md *placeholder
