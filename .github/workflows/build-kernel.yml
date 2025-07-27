@@ -14,19 +14,19 @@ jobs:
       - name: Setup timezone
         uses: szenius/set-timezone@master
         with:
-          timezoneLinux: "America/Sao_Paulo"
+          timezoneLinux: "Asia/Jakarta"
 
       - name: Run standard build script
         run: |
-          export KBUILD_BUILD_USER=nobody
-          export KBUILD_BUILD_HOST=android-build
+          export KBUILD_BUILD_USER=azure
+          export KBUILD_BUILD_HOST=lockbootloader
           source build.sh
           echo "ZIPNAME=${ZIPNAME}" >> $GITHUB_ENV
 
       - name: Run KSU build script
         run: |
-          export KBUILD_BUILD_USER=nobody
-          export KBUILD_BUILD_HOST=android-build
+          export KBUILD_BUILD_USER=azure
+          export KBUILD_BUILD_HOST=lockbootloader
           source build.sh --su
           echo "ZIPNAME_KSU=${ZIPNAME}" >> $GITHUB_ENV
 
@@ -46,7 +46,7 @@ jobs:
         run: |
           BUILD_DATE="$(date '+%H:%M %d/%m/%Y')"
           HEAD="$(git rev-parse HEAD)"
-          HEAD_COMMIT="https://github.com/rd-stuffs/msm-4.14/commit/$HEAD"
+          HEAD_COMMIT="https://github.com/xradens/msm-4.14/commit/$HEAD"
           echo -e "${BUILD_DATE}\n\n${HEAD_COMMIT}" > caption.txt
 
       - name: Upload standard build to Telegram

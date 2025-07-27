@@ -4,7 +4,7 @@
 # Copyright (C) 2020-2021 Adithya R.
 
 SECONDS=0 # builtin bash timer
-ZIPNAME="FSociety-surya-$(date '+%Y%m%d-%H%M').zip"
+ZIPNAME="[FSociety+]-surya-$(date '+%Y%m%d-%H%M').zip"
 TC_DIR="$(pwd)/tc/clang-20"
 AK3_DIR="$(pwd)/android/AnyKernel3"
 DEFCONFIG="surya_defconfig"
@@ -51,11 +51,11 @@ sync_repo() {
 }
 
 if [[ $1 = "-u" || $1 = "--update" ]]; then
-    sync_repo $AK3_DIR "https://github.com/rd-stuffs/AnyKernel3.git" "FSociety" true
+    sync_repo $AK3_DIR "https://github.com/xradens/AnyKernel3.git" "oss" true
     sync_repo $TC_DIR "https://bitbucket.org/rdxzv/clang-standalone.git" "20" true
 	exit
 else
-    sync_repo $AK3_DIR "https://github.com/rd-stuffs/AnyKernel3.git" "FSociety" false
+    sync_repo $AK3_DIR "https://github.com/xradens/AnyKernel3.git" "oss" false
     sync_repo $TC_DIR "https://bitbucket.org/rdxzv/clang-standalone.git" "20" false
 fi
 
@@ -88,7 +88,7 @@ for arg in "$@"; do
 			;;
 		-s|--su)
 			ENABLE_KSU=true
-			ZIPNAME="${ZIPNAME/FSociety-surya/FSociety-KSU}"
+			ZIPNAME="${ZIPNAME/[FSociety+]-surya/[FSociety+]-KSUN}"
 			;;
 		*)
 			echo "Unknown argument: $arg"
@@ -128,7 +128,7 @@ if [ -f "$kernel" ] && [ -f "$dtb" ] && [ -f "$dtbo" ]; then
 	cp -r $AK3_DIR AnyKernel3
 	cp $kernel $dtb $dtbo AnyKernel3
 	cd AnyKernel3
-	git checkout FSociety &> /dev/null
+	git checkout oss &> /dev/null
 	zip -r9 "../$ZIPNAME" * -x .git modules\* patch\* ramdisk\* README.md *placeholder
 	cd ..
 	rm -rf AnyKernel3
